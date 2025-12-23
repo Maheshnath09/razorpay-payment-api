@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Razorpay Test Payment</title>
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+</head>
+<body>
+    <h2>Test Payment Integration</h2>
+    
+    <div style="margin: 20px; padding: 20px; border: 1px solid #ccc;">
+        <h3>Create Order</h3>
+        <div id="orderResult"></div>
+        <button onclick="createOrder()">Create ₹100 Order</button>
+    </div>
+
+    <div style="margin: 20px; padding: 20px; border: 1px solid #ccc;">
+        <h3>Payment Status</h3>
+        <div id="paymentStatus"></div>
+    </div>
+
+    <script>
+        async function createOrder() {
+            try {
+                const response = await fetch('http://localhost:8000/payments/create-order', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        amount: 100.0,
+                        currency: "INR",
+                        customer_name: "Test User",
+                        customer_email: "test@example.com",
+                        description: "Test payment from frontend"
+                    })
+                });
+
+                const orderData = await response.json();
+                document.getElementById('orderResult').innerHTML = `
+                    <p>Order Created: ${orderData.order_id}</p>
+                    <button onclick="initiatePayment('${orderData.order_id}', '${orderData.key_id}')">
+                        Pay Now
+                    </button>
+                `;
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        function initiatePayment(orderId, keyId) {
+            const options = {
+                key: keyId,
+                amount: 10000, // amount in paise
+                currency: "INR",
+                name: "Test Company",
+                description: "Test Transaction",
+                order_id: orderId,
+                handler: function (response) {
+                    document.getElementById('paymentStatus').innerHTML = `
+                        <p>Payment Successful!</p>
+                        <p>Payment ID: ${response.razorpay_payment_id}</p>
+                        <p>Order ID: ${response.razorpay_order_id}</p>
+                        <button onclick="verifyPayment('${response.razorpay_order_id}', '${response.razorpay_payment_id}', '${response.razorpay_signature}')">
+                            Verify Payment
+                        </button>
+                    `;
+                },
+                prefill: {
+                    name: "Test User",
+                    email: "test@example.com",
+                    contact: "9999999999"
+                },
+                notes: {
+                    address: "Test Address"
+                },
+                theme: {
+                    color: "#3399cc"
+                }
+            };
+
+            const rzp = new Razorpay(options);
+            rzp.open();
+        }
+
+        async function verifyPayment(orderId, paymentId, signature) {
+            try {
+                const response = await fetch('http://localhost:8000/payments/verify-payment', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        order_id: orderId,
+                        payment_id: paymentId,
+                        signature: signature
+                    })
+                });
+
+                const result = await response.json();
+                document.getElementById('paymentStatus').innerHTML += `
+                    <p>Verification: ${result.status}</p>
+                    <pre>${JSON.stringify(result, null, 2)}</pre>
+                `;
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+    </script>
+</body>
+</html>
